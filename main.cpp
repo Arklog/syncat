@@ -3,23 +3,57 @@
 #include <vector>
 #include <unistd.h>
 #include <unordered_map>
-
 #include "indicators/progress_bar.hpp"
+#include "argparse/argparse.hpp"
 
-const size_t buff_size = 32000;
+constexpr size_t buff_size = 32 * 1 << 20; //32mb
+
+void parse_size(size_t &size, std::string arg) {
+    static const std::unordered_map<std::string, float> size_map = {
+        {"kb", 1 << 10},
+        {"mb", 1 << 20},
+        {"gb", 1 << 30},
+        {"tb", 1 << 40}
+    };
+    std::ranges::for_each(arg, ::tolower);
+
+    auto iter = arg.begin();
+    while (!::isalpha(*iter))
+        ++iter;
+
+    std::string value(arg.begin(), iter);
+    std::string size_type(iter, arg.end());
+
+    auto fsize = ::strtof(value.c_str(), nullptr);
+    size = static_cast<size_t>(fsize);
+
+    if (size_type.empty())
+        return;
+    size = static_cast<size_t>(size_map.at(size_type) * fsize);
+}
+
+struct {
+    std::string infile{};
+    std::string outfile{};
+    size_t buff_size = buff_size;
+} options;
 
 int main(int argc, char **argv) {
-    if (argc != 3)
-        return 1;
+    auto program = argparse::ArgumentParser{"syncat"};
 
-    std::string infile = argv[1];
-    std::string outfile = argv[2];
+    program.add_argument("infile").required().help("input file").store_into(options.infile);
+    program.add_argument("outfile").required().help("output file").store_into(options.outfile);
+    program.add_argument("--bs").help("buffer size").action([] (std::string arg) {
+        parse_size(options.buff_size, std::move(arg));
+    });
 
-    std::ifstream ifs(infile);
-    std::ofstream ofs(outfile);
+    program.parse_args(argc, argv);
+
+    std::ifstream ifs(options.infile);
+    std::ofstream ofs(options.outfile);
 
     std::vector<char> buffer;
-    buffer.reserve(buff_size);
+    buffer.reserve(options.buff_size);
 
     auto fsize = ifs.tellg();
     ifs.seekg(0, std::ios::end);
@@ -36,7 +70,7 @@ int main(int argc, char **argv) {
     auto progress = ifs.tellg();
 
     while (!ifs.eof()) {
-        ifs.read(buffer.data(), buff_size);
+        ifs.read(buffer.data(), options.buff_size);
         ofs.write(buffer.data(), ifs.gcount());
 
         auto double_progress = static_cast<double>(progress) / static_cast<double>(fsize);
