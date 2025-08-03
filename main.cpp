@@ -12,8 +12,7 @@ void parse_size(size_t &size, std::string arg) {
     static const std::unordered_map<std::string, float> size_map = {
         {"kb", 1 << 10},
         {"mb", 1 << 20},
-        {"gb", 1 << 30},
-        {"tb", 1 << 40}
+        {"gb", 1 << 30}
     };
     std::ranges::for_each(arg, ::tolower);
 
