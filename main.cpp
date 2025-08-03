@@ -6,7 +6,7 @@
 #include "indicators/progress_bar.hpp"
 #include "argparse/argparse.hpp"
 
-constexpr size_t buff_size = 32 * 1 << 20; //32mb
+constexpr size_t buff_size = 32 * (1 << 20); //32mb
 
 void parse_size(size_t &size, std::string arg) {
     static const std::unordered_map<std::string, float> size_map = {
@@ -24,7 +24,11 @@ void parse_size(size_t &size, std::string arg) {
     std::string value(arg.begin(), iter);
     std::string size_type(iter, arg.end());
 
-    auto fsize = ::strtof(value.c_str(), nullptr);
+    char *check = nullptr;
+    auto fsize = ::strtof(value.c_str(), &check);
+
+    if (*check)
+        throw std::invalid_argument("Invalid size");
     size = static_cast<size_t>(fsize);
 
     if (size_type.empty())
@@ -35,11 +39,13 @@ void parse_size(size_t &size, std::string arg) {
 struct {
     std::string infile{};
     std::string outfile{};
-    size_t buff_size = buff_size;
+    size_t buff_size{buff_size};
 } options;
 
 int main(int argc, char **argv) {
     auto program = argparse::ArgumentParser{"syncat"};
+
+    options.buff_size = buff_size;
 
     program.add_argument("infile").required().help("input file").store_into(options.infile);
     program.add_argument("outfile").required().help("output file").store_into(options.outfile);
